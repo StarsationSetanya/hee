@@ -1740,8 +1740,8 @@ end)
 	end  
 	
 	OrionLib:MakeNotification({
-		Name = "UI Library Upgrade",
-		Content = "Subscribe To Pubzy",
+		Name = "UI ใครก็ไม่รู้ไอเหี้ย",
+		Content = "Subscribe To Starsation",
 		Time = 5
 	})
 	
