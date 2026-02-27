@@ -1484,6 +1484,13 @@ function StarsationLibrary:CreateWindow(Settings)
 		LoadingFrame.Version.Text = "Starsation UI"
 	end
 
+	-- Hide Rayfield Branding
+	for _, child in ipairs(LoadingFrame:GetChildren()) do
+		if child:IsA("ImageLabel") or (child:IsA("TextLabel") and child.Name ~= "Title" and child.Name ~= "Subtitle" and child.Name ~= "Version") then
+			child.Visible = false
+		end
+	end
+
 	if Settings.Icon and Settings.Icon ~= 0 and Topbar:FindFirstChild('Icon') then
 		Topbar.Icon.Visible = true
 		Topbar.Title.Position = UDim2.new(0, 47, 0.5, 0)
