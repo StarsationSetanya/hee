@@ -591,6 +591,18 @@ elseif not useStudio then
 	Starsation.Parent = CoreGui
 end
 
+-- Permanent Branding Removal (Recursive)
+local function SCRUB_BRANDING(obj)
+	for _, child in ipairs(obj:GetChildren()) do
+		if string.find(string.lower(child.Name), "rayfield") or string.find(string.lower(child.Name), "logo") or string.find(string.lower(child.Name), "diamond") then
+			child:Destroy()
+		else
+			SCRUB_BRANDING(child)
+		end
+	end
+end
+SCRUB_BRANDING(Starsation)
+
 if gethui then
 	for _, Interface in ipairs(gethui():GetChildren()) do
 		if Interface.Name == Starsation.Name and Interface ~= Starsation then
@@ -636,7 +648,7 @@ local dragOffset = 255
 local dragOffsetMobile = 150
 
 Starsation.DisplayOrder = 100
-LoadingFrame.Version.Text = Release
+-- Loading Frame logic removed
 
 -- Thanks to Latte Softworks for the Lucide integration for Roblox
 local Icons = useStudio and require(script.Parent.icons) or loadstring(game:HttpGet('https://raw.githubusercontent.com/StarsationSetanya/hee/refs/heads/main/icons.lua'))()
@@ -1438,19 +1450,7 @@ local function createSettings(window)
 	updateSettings()
 end
 
-
-
 function StarsationLibrary:CreateWindow(Settings)
-	if Starsation:FindFirstChild('Loading') then
-		if getgenv and not getgenv().StarsationCached then
-			Starsation.Enabled = true
-			Starsation.Loading.Visible = true
-
-			task.wait(1.4)
-			Starsation.Loading.Visible = false
-		end
-	end
-
 	if getgenv then getgenv().StarsationCached = true end
 
 	if not correctBuild and not Settings.DisableBuildWarnings then
@@ -1467,16 +1467,6 @@ function StarsationLibrary:CreateWindow(Settings)
 	local Passthrough = false
 	Topbar.Title.Text = Settings.Name
 
-	Main.Size = UDim2.new(0, 420, 0, 100)
-	Main.Visible = true
-	Main.BackgroundTransparency = 1
-	if Main:FindFirstChild('Notice') then Main.Notice.Visible = false end
-	Main.Shadow.Image.ImageTransparency = 1
-
-	LoadingFrame.Title.TextTransparency = 1
-	LoadingFrame.Subtitle.TextTransparency = 1
-
-	LoadingFrame.Version.TextTransparency = 1
 	LoadingFrame.Title.Text = Settings.LoadingTitle or "Starsation"
 	LoadingFrame.Subtitle.Text = Settings.LoadingSubtitle or "Interface Suite"
 
@@ -1522,9 +1512,9 @@ function StarsationLibrary:CreateWindow(Settings)
 		end
 	end
 
-	Topbar.Visible = false
-	Elements.Visible = false
-	LoadingFrame.Visible = true
+	Topbar.Visible = true
+	Elements.Visible = true
+	LoadingFrame.Visible = false
 
 	if not Settings.DisableStarsationPrompts then
 		task.spawn(function()
