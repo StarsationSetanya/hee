@@ -592,16 +592,16 @@ elseif not useStudio then
 end
 
 -- Permanent Branding Removal (Recursive)
-local function SCRUB_BRANDING(obj)
-	for _, child in ipairs(obj:GetChildren()) do
-		if string.find(string.lower(child.Name), "rayfield") or string.find(string.lower(child.Name), "logo") or string.find(string.lower(child.Name), "diamond") then
-			child:Destroy()
-		else
-			SCRUB_BRANDING(child)
-		end
-	end
-end
-SCRUB_BRANDING(Starsation)
+-- local function SCRUB_BRANDING(obj)
+-- 	for _, child in ipairs(obj:GetChildren()) do
+-- 		if string.find(string.lower(child.Name), "rayfield") or string.find(string.lower(child.Name), "logo") or string.find(string.lower(child.Name), "diamond") then
+-- 			child:Destroy()
+-- 		else
+-- 			SCRUB_BRANDING(child)
+-- 		end
+-- 	end
+-- end
+-- SCRUB_BRANDING(Starsation)
 
 if gethui then
 	for _, Interface in ipairs(gethui():GetChildren()) do
