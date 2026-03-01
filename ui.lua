@@ -552,7 +552,7 @@ local CoreGui = game:GetService("CoreGui")
 
 -- Interface Management
 
-local Starsation = useStudio and script.Parent:FindFirstChild('Starsation UI') or game:GetObjects("rbxassetid://10804731440")[1]
+local Starsation = useStudio and script.Parent:FindFirstChild('Starsation UI') or game:GetObjects("rbxassetid://")[1]
 local buildAttempts = 0
 local correctBuild = false
 local warned
@@ -572,7 +572,7 @@ repeat
 		warned = true
 	end
 
-	toDestroy, Starsation = Starsation, useStudio and script.Parent:FindFirstChild('Starsation') or game:GetObjects("rbxassetid://10804731440")[1]
+	toDestroy, Starsation = Starsation, useStudio and script.Parent:FindFirstChild('Starsation') or game:GetObjects("rbxassetid://")[1]
 	if toDestroy and not useStudio then toDestroy:Destroy() end
 
 	buildAttempts = buildAttempts + 1
