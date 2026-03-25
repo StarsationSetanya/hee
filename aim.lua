@@ -52,6 +52,8 @@ Environment.Settings = {
 	TeamCheck = false,
 	AliveCheck = true,
 	WallCheck = false,
+	WallBang = false,
+	NoclipOnFly = false,
 	Sensitivity = 0,
 	ThirdPerson = false,
 	ThirdPersonSensitivity = 3,
@@ -77,6 +79,29 @@ Environment.FOVSettings = {
 }
 
 Environment.FOVCircle = Drawingnew("Circle")
+
+Environment.FlySettings = {
+    ToggleKey = "F"
+}
+
+Environment.Fly = {
+    State = false,
+    Ctrl = {f = 0, b = 0, l = 0, r = 0},
+    LastCtrl = {f = 0, b = 0, l = 0, r = 0},
+    Speed = 0,
+    MaxSpeed = 50,
+    BodyGyro = nil,
+    BodyVelocity = nil
+}
+
+Environment.Movement = {
+    WalkSpeedMultiplier = 1
+}
+
+Environment.Noclip = {
+    Enabled = false,
+    OriginalCollide = {}
+}
 
 --// New Wall Hack ESP Settings
 Environment.WrappedPlayers = {}
@@ -197,6 +222,136 @@ local function GetPlayerTable(Player)
         if v.Name == Player.Name then
             return v
         end
+    end
+end
+
+local function FlyKeyMatches(Input)
+    local Key = #Environment.FlySettings.ToggleKey == 1 and stringupper(Environment.FlySettings.ToggleKey) or Environment.FlySettings.ToggleKey
+    if Input.UserInputType == Enum.UserInputType.Keyboard and Input.KeyCode.Name == Key then
+        return true
+    end
+    if Input.UserInputType.Name == Key then
+        return true
+    end
+    return false
+end
+
+local function Fly_Stop()
+    Environment.Fly.State = false
+    if Environment.Fly.BodyGyro then Environment.Fly.BodyGyro:Destroy() Environment.Fly.BodyGyro = nil end
+    if Environment.Fly.BodyVelocity then Environment.Fly.BodyVelocity:Destroy() Environment.Fly.BodyVelocity = nil end
+    Environment.Fly.Ctrl = {f = 0, b = 0, l = 0, r = 0}
+    Environment.Fly.LastCtrl = {f = 0, b = 0, l = 0, r = 0}
+    Environment.Fly.Speed = 0
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+        LocalPlayer.Character:FindFirstChildOfClass("Humanoid").PlatformStand = false
+    end
+    if ServiceConnections.FlyRender then ServiceConnections.FlyRender:Disconnect() ServiceConnections.FlyRender = nil end
+    if ServiceConnections.FlyMoveBegin then ServiceConnections.FlyMoveBegin:Disconnect() ServiceConnections.FlyMoveBegin = nil end
+    if ServiceConnections.FlyMoveEnd then ServiceConnections.FlyMoveEnd:Disconnect() ServiceConnections.FlyMoveEnd = nil end
+    if ServiceConnections.NoclipStepped then ServiceConnections.NoclipStepped:Disconnect() ServiceConnections.NoclipStepped = nil end
+    for part, original in next, Environment.Noclip.OriginalCollide do
+        if part and part.Parent then
+            part.CanCollide = original
+        end
+    end
+    Environment.Noclip.OriginalCollide = {}
+    Environment.Noclip.Enabled = false
+end
+
+local function Fly_Start()
+    local plr = LocalPlayer
+    if not plr or not plr.Character then return end
+    local torso = plr.Character:FindFirstChild("Torso") or plr.Character:FindFirstChild("HumanoidRootPart")
+    local humanoid = plr.Character:FindFirstChildOfClass("Humanoid")
+    if not torso or not humanoid then return end
+    local bg = Instance.new("BodyGyro", torso)
+    bg.P = 9e4
+    bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+    bg.CFrame = torso.CFrame
+    local bv = Instance.new("BodyVelocity", torso)
+    bv.Velocity = Vector3.new(0, 0.1, 0)
+    bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    Environment.Fly.BodyGyro = bg
+    Environment.Fly.BodyVelocity = bv
+    Environment.Fly.State = true
+    humanoid.PlatformStand = true
+
+    if Environment.Settings.NoclipOnFly and not ServiceConnections.NoclipStepped then
+        Environment.Noclip.Enabled = true
+        Environment.Noclip.OriginalCollide = {}
+        ServiceConnections.NoclipStepped = RunService.Stepped:Connect(function()
+            if not Environment.Noclip.Enabled then return end
+            local char = LocalPlayer.Character
+            if not char then return end
+            for _, p in next, char:GetDescendants() do
+                if p:IsA("BasePart") then
+                    if Environment.Noclip.OriginalCollide[p] == nil then
+                        Environment.Noclip.OriginalCollide[p] = p.CanCollide
+                    end
+                    p.CanCollide = false
+                end
+            end
+        end)
+    end
+
+    ServiceConnections.FlyRender = RunService.RenderStepped:Connect(function()
+        if not Environment.Fly.State then return end
+        if Environment.Fly.Ctrl.l + Environment.Fly.Ctrl.r ~= 0 or Environment.Fly.Ctrl.f + Environment.Fly.Ctrl.b ~= 0 then
+            Environment.Fly.Speed = Environment.Fly.Speed + .5 + (Environment.Fly.Speed / Environment.Fly.MaxSpeed)
+            if Environment.Fly.Speed > Environment.Fly.MaxSpeed then
+                Environment.Fly.Speed = Environment.Fly.MaxSpeed
+            end
+        elseif not (Environment.Fly.Ctrl.l + Environment.Fly.Ctrl.r ~= 0 or Environment.Fly.Ctrl.f + Environment.Fly.Ctrl.b ~= 0) and Environment.Fly.Speed ~= 0 then
+            Environment.Fly.Speed = Environment.Fly.Speed - 1
+            if Environment.Fly.Speed < 0 then
+                Environment.Fly.Speed = 0
+            end
+        end
+        if (Environment.Fly.Ctrl.l + Environment.Fly.Ctrl.r) ~= 0 or (Environment.Fly.Ctrl.f + Environment.Fly.Ctrl.b) ~= 0 then
+            Environment.Fly.BodyVelocity.Velocity = ((workspace.CurrentCamera.CoordinateFrame.LookVector * (Environment.Fly.Ctrl.f + Environment.Fly.Ctrl.b)) + ((workspace.CurrentCamera.CoordinateFrame * CFrame.new(Environment.Fly.Ctrl.l + Environment.Fly.Ctrl.r, (Environment.Fly.Ctrl.f + Environment.Fly.Ctrl.b) * .2, 0).p) - workspace.CurrentCamera.CoordinateFrame.p)) * Environment.Fly.Speed
+            Environment.Fly.LastCtrl = {f = Environment.Fly.Ctrl.f, b = Environment.Fly.Ctrl.b, l = Environment.Fly.Ctrl.l, r = Environment.Fly.Ctrl.r}
+        elseif (Environment.Fly.Ctrl.l + Environment.Fly.Ctrl.r) == 0 and (Environment.Fly.Ctrl.f + Environment.Fly.Ctrl.b) == 0 and Environment.Fly.Speed ~= 0 then
+            Environment.Fly.BodyVelocity.Velocity = ((workspace.CurrentCamera.CoordinateFrame.LookVector * (Environment.Fly.LastCtrl.f + Environment.Fly.LastCtrl.b)) + ((workspace.CurrentCamera.CoordinateFrame * CFrame.new(Environment.Fly.LastCtrl.l + Environment.Fly.LastCtrl.r, (Environment.Fly.LastCtrl.f + Environment.Fly.LastCtrl.b) * .2, 0).p) - workspace.CurrentCamera.CoordinateFrame.p)) * Environment.Fly.Speed
+        else
+            Environment.Fly.BodyVelocity.Velocity = Vector3.new(0, 0.1, 0)
+        end
+        Environment.Fly.BodyGyro.CFrame = workspace.CurrentCamera.CoordinateFrame * CFrame.Angles(-math.rad((Environment.Fly.Ctrl.f + Environment.Fly.Ctrl.b) * 50 * Environment.Fly.Speed / Environment.Fly.MaxSpeed), 0, 0)
+    end)
+
+    ServiceConnections.FlyMoveBegin = UserInputService.InputBegan:Connect(function(Input, gp)
+        if gp then return end
+        if Input.UserInputType == Enum.UserInputType.Keyboard then
+            local n = Input.KeyCode.Name
+            if n == "W" then Environment.Fly.Ctrl.f = 1
+            elseif n == "S" then Environment.Fly.Ctrl.b = -1
+            elseif n == "A" then Environment.Fly.Ctrl.l = -1
+            elseif n == "D" then Environment.Fly.Ctrl.r = 1 end
+        end
+    end)
+
+    ServiceConnections.FlyMoveEnd = UserInputService.InputEnded:Connect(function(Input, gp)
+        if gp then return end
+        if Input.UserInputType == Enum.UserInputType.Keyboard then
+            local n = Input.KeyCode.Name
+            if n == "W" then Environment.Fly.Ctrl.f = 0
+            elseif n == "S" then Environment.Fly.Ctrl.b = 0
+            elseif n == "A" then Environment.Fly.Ctrl.l = 0
+            elseif n == "D" then Environment.Fly.Ctrl.r = 0 end
+        end
+    end)
+end
+
+local function GetHumanoid()
+    if LocalPlayer and LocalPlayer.Character then
+        return LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    end
+end
+
+local function ApplyWalkSpeed()
+    local h = GetHumanoid()
+    if h then
+        h.WalkSpeed = 16 * Environment.Movement.WalkSpeedMultiplier
     end
 end
 
@@ -590,7 +745,7 @@ local function GetClosestPlayer()
 				if Environment.Settings.AliveCheck and v.Character:FindFirstChildOfClass("Humanoid").Health <= 0 then continue end
 				
 				-- Wall Check: ใช้ Raycast เพื่อตรวจสอบว่ามีกำแพงบังหรือไม่
-				if Environment.Settings.WallCheck then
+				if Environment.Settings.WallCheck and not Environment.Settings.WallBang then
 					local TargetPart = v.Character[Environment.Settings.LockPart]
 					local CameraPosition = Camera.CFrame.Position
 					local Direction = (TargetPart.Position - CameraPosition)
@@ -803,6 +958,32 @@ local function Load()
     
     -- Load Crosshair
     AddCrosshair()
+    
+    ServiceConnections.FlyToggleConnection = UserInputService.InputBegan:Connect(function(Input, gp)
+        if gp then return end
+        if FlyKeyMatches(Input) then
+            if Environment.Fly.State then
+                Fly_Stop()
+            else
+                Fly_Start()
+            end
+        end
+    end)
+    
+    ApplyWalkSpeed()
+    ServiceConnections.LocalCharacterAdded = LocalPlayer.CharacterAdded:Connect(function()
+        task.wait(0.1)
+        ApplyWalkSpeed()
+    end)
+    ServiceConnections.WalkSpeedHeartbeat = RunService.Heartbeat:Connect(function()
+        local h = GetHumanoid()
+        if h and not h.PlatformStand then
+            local target = 16 * Environment.Movement.WalkSpeedMultiplier
+            if h.WalkSpeed ~= target then
+                h.WalkSpeed = target
+            end
+        end
+    end)
 end
 
 --// Script Functions
@@ -1018,6 +1199,90 @@ AimbotTab:CreateColorPicker({
 	end,
 })
 
+local FlyTab = Window:CreateTab("Fly", 4483362458)
+local FlySection = FlyTab:CreateSection("ตั้งค่า Fly")
+
+FlyTab:CreateToggle({
+    Name = "เปิดใช้งาน Fly",
+    CurrentValue = Environment.Fly.State,
+    Flag = "FlyEnabled",
+    Callback = function(Value)
+        if Value then
+            Fly_Start()
+        else
+            Fly_Stop()
+        end
+    end,
+})
+
+FlyTab:CreateDropdown({
+    Name = "ปุ่มสลับโหมดบิน",
+    Options = {"MouseButton1", "MouseButton2", "E", "Q", "F", "X", "Z", "I", "LeftControl", "LeftShift"},
+    CurrentOption = {Environment.FlySettings.ToggleKey},
+    MultipleOptions = false,
+    Flag = "FlyToggleKey",
+    Callback = function(Options)
+        Environment.FlySettings.ToggleKey = Options[1]
+    end,
+})
+
+FlyTab:CreateToggle({
+    Name = "Noclip ขณะบิน",
+    CurrentValue = Environment.Settings.NoclipOnFly,
+    Flag = "NoclipOnFly",
+    Callback = function(Value)
+        Environment.Settings.NoclipOnFly = Value
+        if Environment.Fly.State then
+            if Value then
+                if not ServiceConnections.NoclipStepped then
+                    Environment.Noclip.Enabled = true
+                    Environment.Noclip.OriginalCollide = {}
+                    ServiceConnections.NoclipStepped = RunService.Stepped:Connect(function()
+                        if not Environment.Noclip.Enabled then return end
+                        local char = LocalPlayer.Character
+                        if not char then return end
+                        for _, p in next, char:GetDescendants() do
+                            if p:IsA("BasePart") then
+                                if Environment.Noclip.OriginalCollide[p] == nil then
+                                    Environment.Noclip.OriginalCollide[p] = p.CanCollide
+                                end
+                                p.CanCollide = false
+                            end
+                        end
+                    end)
+                end
+            else
+                if ServiceConnections.NoclipStepped then
+                    ServiceConnections.NoclipStepped:Disconnect()
+                    ServiceConnections.NoclipStepped = nil
+                end
+                for part, original in next, Environment.Noclip.OriginalCollide do
+                    if part and part.Parent then
+                        part.CanCollide = original
+                    end
+                end
+                Environment.Noclip.OriginalCollide = {}
+                Environment.Noclip.Enabled = false
+            end
+        end
+    end,
+})
+
+local MovementSection = FlyTab:CreateSection("Movement")
+
+FlyTab:CreateSlider({
+    Name = "ตัวคูณความเร็ว",
+    Range = {1, 10},
+    Increment = 1,
+    Suffix = "x",
+    CurrentValue = Environment.Movement.WalkSpeedMultiplier,
+    Flag = "WalkSpeedMultiplier",
+    Callback = function(Value)
+        Environment.Movement.WalkSpeedMultiplier = Value
+        ApplyWalkSpeed()
+    end,
+})
+
 local FilterSection = AimbotTab:CreateSection("ตัวกรองเป้าหมาย")
 
 AimbotTab:CreateToggle({
@@ -1044,6 +1309,15 @@ AimbotTab:CreateToggle({
 	Flag = "WallCheck",
 	Callback = function(Value)
 		Environment.Settings.WallCheck = Value
+	end,
+})
+
+AimbotTab:CreateToggle({
+	Name = "โหมดยิงทะลุ (Ignore Wall Check)",
+	CurrentValue = Environment.Settings.WallBang,
+	Flag = "WallBang",
+	Callback = function(Value)
+		Environment.Settings.WallBang = Value
 	end,
 })
 
@@ -1373,3 +1647,11 @@ MiscTab:CreateParagraph({
 	Title = "Aimbot Script",
 	Content = "พ่อมึงอะ น่าหี สูตรลาบ วัตถุดิบลาบหมู หมูสับ 300 กรัม น้ำเปล่า ½ ถ้วย ต้นหอมซอย 2 ต้น ใบสะระแหน่ 2 ต้น ผักชีฝรั่งซอย 2 ต้น หอมแดงซอย 3 กลีบ พริกป่น 2 ช้อนโต๊ะ น้ำปลา 2 ช้อนโต๊ะ น้ำมะนาว 2 ช้อนโต๊ะ ข้าวคั่ว 2 ช้อนโต๊ะ น้ำตาล ½ ช้อนชา พริกแห้งทอดสำหรับตกแต่ง วิธีทําลาบหมู STEP 1 : รวนหมูสับ ใส่น้ำเปล่าลงในหม้อ แล้วใส่หมูสับลงไปรวนให้สุก TIP : การเติมน้ำลงในเนื้อหมูจะช่วยให้เนื้อหมูฉ่ำไม่แข็งกระด้าง และควรใช้ทัพพีขยี้หมูให้แตกออกจากกัน STEP 2 : ปรุงรสลาบหมู ตักหมูที่รวนแล้วใส่ในชามผสม ใส่เครื่องปรุง พริกป่น น้ำปลา ข้าวคั่ว และน้ำตาล คลุกเค้าให้เข้ากัน จากนั้นเติมมะนาว ผักชีฝรั่ง หอมแดงซอย ต้มหอม ผักชีฝรั่ง และใบสะระแหน่ จากนั้นคลุกเคล้าให้เข้ากัน STEP 3 : จัดเสิร์ฟ ตัก “ลาบหมู” ลงใส่จานที่ต้องการจัดเสิร์ฟ ตกแต่งด้วยพริกแห้งทอด และใบสะระแหน่ กินคู่กับผักเคียง แค่นี้ก็เสร็จแล้ว"
 })
+
+Button.MouseButton1Down:Connect(function()
+	if Environment.Fly.State then
+		Fly_Stop()
+	else
+		Fly_Start()
+	end
+end)
