@@ -1,4 +1,3 @@
--- Cleanup previous execution
 if getgenv().MM2Admin_Cleanup then
     getgenv().MM2Admin_Cleanup()
 end
@@ -18,7 +17,6 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 
--- Variables for logic
 getgenv().MM2Admin_Run = true
 local flying = false
 local noclip = false
@@ -31,7 +29,61 @@ local AntiAFKConnection
 
 local FOVSettings = {
     Enabled = false,
-@@ -80,6 +81,11 @@
+    Visible = false,
+    Amount = 90,
+    Color = Color3.fromRGB(255, 255, 255),
+    Transparency = 0.5,
+    Thickness = 1,
+    Filled = false
+}
+
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.ZIndex = 1
+getgenv().MM2Admin_FOVCircle = FOVCircle
+
+local speedfly = 1
+local speedget = 1
+local Mouse = lplayer:GetMouse()
+
+local function GetMurderer()
+    for i,v in pairs(plrs:GetPlayers()) do
+        if v.Character and (v.Character:FindFirstChild("Knife") or v.Backpack:FindFirstChild("Knife")) then
+            return v
+        end
+    end
+end
+
+local function GetSheriff()
+    for i,v in pairs(plrs:GetPlayers()) do
+        if v.Character and (v.Character:FindFirstChild("Gun") or v.Backpack:FindFirstChild("Gun")) then
+            return v
+        end
+    end
+end
+
+local function GetPlayerNames()
+    local names = {}
+    for _, v in pairs(plrs:GetPlayers()) do
+        if v ~= lplayer then
+            table.insert(names, v.Name)
+        end
+    end
+    return names
+end
+
+local faces = {"Back","Bottom","Front","Left","Right","Top"}
+local function ClearESP()
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v.Name == ("EGUI") then
+            v:Destroy()
+        end
+    end
+end
+
+getgenv().MM2Admin_Cleanup = function()
+    getgenv().MM2Admin_Run = false
+    if getgenv().MM2Admin_FOVCircle then
+        getgenv().MM2Admin_FOVCircle:Remove()
     end
     ClearESP()
 
@@ -40,13 +92,351 @@ local FOVSettings = {
         AntiAFKConnection = nil
     end
 
-    -- Attempt to find and destroy old UI ScreenGuis
     local function findAndDestroy(parent)
         if not parent then return end
-@@ -446,302 +452,325 @@
+        for _, obj in pairs(parent:GetChildren()) do
+            if obj:IsA("ScreenGui") and (obj.Name == "Starsation" or obj:FindFirstChild("Main")) then
+                obj:Destroy()
+            end
+        end
+    end
+
+    pcall(function() findAndDestroy(game:GetService("CoreGui")) end)
+    pcall(function() findAndDestroy(lplayer:FindFirstChild("PlayerGui")) end)
+end
+
+local function MakeESP()
+    local isMurderer = lplayer.Backpack:FindFirstChild("Knife") or (lplayer.Character and lplayer.Character:FindFirstChild("Knife"))
+    local isSheriff = lplayer.Backpack:FindFirstChild("Gun") or (lplayer.Character and lplayer.Character:FindFirstChild("Gun"))
+
+    for _, v in pairs(plrs:GetPlayers()) do 
+        if v.Name ~= lplayer.Name and v.Character and v.Character:FindFirstChild("Head") then
+            local targetIsMurderer = v.Backpack:FindFirstChild("Knife") or v.Character:FindFirstChild("Knife")
+            local targetIsSheriff = v.Backpack:FindFirstChild("Gun") or v.Character:FindFirstChild("Gun")
+
+            local shouldShow = false
+            local color = Color3.new(1, 1, 1)
+
+            if isMurderer then
+                shouldShow = true
+                if targetIsSheriff then
+                    color = Color3.new(0, 0, 1)
+                end
+            elseif isSheriff then
+                if targetIsMurderer then
+                    shouldShow = true
+                    color = Color3.new(1, 0, 0)
+                end
+            else
+                if targetIsMurderer then
+                    shouldShow = true
+                    color = Color3.new(1, 0, 0)
+                elseif targetIsSheriff then
+                    shouldShow = true
+                    color = Color3.new(0, 0, 1)
+                end
+            end
+
+            if shouldShow then
+                local bgui = Instance.new("BillboardGui", v.Character.Head)
+                bgui.Name = ("EGUI")
+                bgui.AlwaysOnTop = true
+                bgui.ExtentsOffset = Vector3.new(0,2,0)
+                bgui.Size = UDim2.new(0,200,0,50)
+                local nam = Instance.new("TextLabel", bgui)
+                nam.Text = v.Name
+                nam.BackgroundTransparency = 1
+                nam.TextSize = 15
+                nam.Font = Enum.Font.GothamBold
+                nam.TextColor3 = color
+                nam.Size = UDim2.new(0,200,0,50)
+
+                for _, p in pairs(v.Character:GetChildren()) do
+                    if p:IsA("BasePart") then
+                        for _, f in pairs(faces) do
+                            local m = Instance.new("SurfaceGui", p)
+                            m.Name = ("EGUI")
+                            m.Face = f
+                            m.AlwaysOnTop = true
+                            local mf = Instance.new("Frame", m)
+                            mf.Size = UDim2.new(1, 0, 1, 0)
+                            mf.BorderSizePixel = 0
+                            mf.BackgroundTransparency = 0.5
+                            mf.BackgroundColor3 = color
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+UserInputService.JumpRequest:Connect(function()
+    if getgenv().MM2Admin_Run and InfiniteJump and lplayer.Character and lplayer.Character:FindFirstChildOfClass('Humanoid') then
+        lplayer.Character:FindFirstChildOfClass('Humanoid'):ChangeState("Jumping")
+    end
+end)
+
+local function ToggleFly()
+    flying = not flying
+    if flying then
+        local T = lplayer.Character.HumanoidRootPart
+        local CONTROL = {F = 0, B = 0, L = 0, R = 0}
+        local lCONTROL = {F = 0, B = 0, L = 0, R = 0}
+        local SPEED = 0
+
+        local BG = Instance.new('BodyGyro', T)
+        local BV = Instance.new('BodyVelocity', T)
+        BG.P = 9e4
+        BG.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+        BG.cframe = T.CFrame
+        BV.velocity = Vector3.new(0, 0.1, 0)
+        BV.maxForce = Vector3.new(9e9, 9e9, 9e9)
+
+        task.spawn(function()
+            repeat task.wait()
+                if not getgenv().MM2Admin_Run then break end
+                if lplayer.Character:FindFirstChild("Humanoid") then
+                    lplayer.Character.Humanoid.PlatformStand = true
+                end
+                if CONTROL.L + CONTROL.R ~= 0 or CONTROL.F + CONTROL.B ~= 0 then
+                    SPEED = 50
+                else
+                    SPEED = 0
+                end
+                if (CONTROL.L + CONTROL.R) ~= 0 or (CONTROL.F + CONTROL.B) ~= 0 then
+                    BV.velocity = ((workspace.CurrentCamera.CoordinateFrame.lookVector * (CONTROL.F + CONTROL.B)) + ((workspace.CurrentCamera.CoordinateFrame * CFrame.new(CONTROL.L + CONTROL.R, (CONTROL.F + CONTROL.B) * 0.2, 0).p) - workspace.CurrentCamera.CoordinateFrame.p)) * SPEED
+                    lCONTROL = {F = CONTROL.F, B = CONTROL.B, L = CONTROL.L, R = CONTROL.R}
+                elseif SPEED == 0 then
+                    BV.velocity = Vector3.new(0, 0.1, 0)
+                else
+                    BV.velocity = ((workspace.CurrentCamera.CoordinateFrame.lookVector * (lCONTROL.F + lCONTROL.B)) + ((workspace.CurrentCamera.CoordinateFrame * CFrame.new(lCONTROL.L + lCONTROL.R, (lCONTROL.F + lCONTROL.B) * 0.2, 0).p) - workspace.CurrentCamera.CoordinateFrame.p)) * SPEED
+                end
+                BG.cframe = workspace.CurrentCamera.CoordinateFrame
+            until not flying or not getgenv().MM2Admin_Run
+            BG:Destroy()
+            BV:Destroy()
+            if lplayer.Character and lplayer.Character:FindFirstChild("Humanoid") then
+                lplayer.Character.Humanoid.PlatformStand = false
+            end
+        end)
+
+        local w_conn, s_conn, a_conn, d_conn
+        local w_up, s_up, a_up, d_up
+
+        w_conn = Mouse.KeyDown:Connect(function(key) if key:lower() == "w" then CONTROL.F = speedfly end end)
+        s_conn = Mouse.KeyDown:Connect(function(key) if key:lower() == "s" then CONTROL.B = -speedfly end end)
+        a_conn = Mouse.KeyDown:Connect(function(key) if key:lower() == "a" then CONTROL.L = -speedfly end end)
+        d_conn = Mouse.KeyDown:Connect(function(key) if key:lower() == "d" then CONTROL.R = speedfly end end)
+
+        w_up = Mouse.KeyUp:Connect(function(key) if key:lower() == "w" then CONTROL.F = 0 end end)
+        s_up = Mouse.KeyUp:Connect(function(key) if key:lower() == "s" then CONTROL.B = 0 end end)
+        a_up = Mouse.KeyUp:Connect(function(key) if key:lower() == "a" then CONTROL.L = 0 end end)
+        d_up = Mouse.KeyUp:Connect(function(key) if key:lower() == "d" then CONTROL.R = 0 end end)
+
+        task.spawn(function()
+            repeat task.wait() until not flying or not getgenv().MM2Admin_Run
+            w_conn:Disconnect() s_conn:Disconnect() a_conn:Disconnect() d_conn:Disconnect()
+            w_up:Disconnect() s_up:Disconnect() a_up:Disconnect() d_up:Disconnect()
+        end)
+    end
+end
+
+local function XrayOn(obj)
+    for _,v in pairs(obj:GetChildren()) do
+        if not getgenv().MM2Admin_Run then break end
+        if (v:IsA("BasePart")) and not v.Parent:FindFirstChild("Humanoid") then
+            v.LocalTransparencyModifier = 0.75
+        end
+        XrayOn(v)
+    end
+end
+
+local function XrayOff(obj)
+    for _,v in pairs(obj:GetChildren()) do
+        if not getgenv().MM2Admin_Run then break end
+        if (v:IsA("BasePart")) and not v.Parent:FindFirstChild("Humanoid") then
+            v.LocalTransparencyModifier = 0
+        end
+        XrayOff(v)
+    end
+end
+
+local function GetClosestToMouse()
+    local target = nil
+    local maxDist = FOVSettings.Enabled and FOVSettings.Amount or 5000
+
+    for _, v in pairs(plrs:GetPlayers()) do
+        if v ~= lplayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChild("Humanoid") then
+            if v.Character.Humanoid.Health <= 0 then continue end
+
+            local hasKnife = v.Character:FindFirstChild("Knife") or v.Backpack:FindFirstChild("Knife")
+            if not hasKnife then continue end
+
+            local pos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(v.Character.HumanoidRootPart.Position)
+            if onScreen then
+                local dist = (Vector2.new(pos.X, pos.Y) - UserInputService:GetMouseLocation()).Magnitude
+                if dist < maxDist then
+                    maxDist = dist
+                    target = v
+                end
+            end
+        end
+    end
+    return target
+end
+
+RunService.RenderStepped:Connect(function()
+    if not getgenv().MM2Admin_Run then return end
+    FOVCircle.Visible = FOVSettings.Enabled and FOVSettings.Visible
+    FOVCircle.Radius = FOVSettings.Amount
+    FOVCircle.Position = UserInputService:GetMouseLocation()
+    FOVCircle.Color = FOVSettings.Color
+    FOVCircle.Transparency = FOVSettings.Transparency
+    FOVCircle.Thickness = FOVSettings.Thickness
+    FOVCircle.Filled = FOVSettings.Filled
+
+    if AimlockToggle then
+        local hasGun = lplayer.Backpack:FindFirstChild("Gun") or (lplayer.Character and lplayer.Character:FindFirstChild("Gun"))
+        if hasGun then
+            local target = GetClosestToMouse()
+            if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") and target.Character.Humanoid.Health > 0 then
+                workspace.CurrentCamera.CFrame = CFrame.new(workspace.CurrentCamera.CFrame.Position, target.Character.HumanoidRootPart.Position)
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while getgenv().MM2Admin_Run and task.wait(0.25) do
+        if CoinFarmToggle and lplayer.Character and lplayer.Character:FindFirstChild("HumanoidRootPart") then
+            local currentPos = lplayer.Character.HumanoidRootPart.CFrame
+            local found = false
+            for _, v in pairs(workspace:GetChildren()) do
+                if v.Name == "CoinContainer" then
+                    local coin = v:FindFirstChild("Coin_Server") and v.Coin_Server:FindFirstChild("Coin")
+                    if coin then
+                        lplayer.Character.HumanoidRootPart.CFrame = coin.CFrame
+                        found = true
+                        break
+                    end
+                end
+            end
+            if not found then
+            end
+        end
+    end
+end)
+
+local Window = StarsationLibrary:CreateWindow({
+	Name = "Murder Mystery 2 Admin Panel",
+	LoadingTitle = "Murder Mystery 2 Admin Panel",
+	LoadingSubtitle = "by atl4ntic.",
+	Theme = "Default",
+	ConfigurationSaving = {
+		Enabled = true,
+		FolderName = "atl4ntic. MM2",
+		FileName = "Config"
+	},
+})
+
+local MainTab = Window:CreateTab("หลัก", 4483362458)
+local AimTab = Window:CreateTab("ล็อคเป้า", 4483362458)
+local VisualsTab = Window:CreateTab("มองทะลุ", 4483362458)
+local TeleportTab = Window:CreateTab("วาร์ป", 4483362458)
+local PlayerTab = Window:CreateTab("ผู้เล่น", 4483362458)
+
+local FarmSection = MainTab:CreateSection("Farming")
+MainTab:CreateToggle({
+    Name = "ฟาร์มเหรียญ (เสี่ยง)",
+    CurrentValue = false,
+    Callback = function(Value)
+        CoinFarmToggle = Value
+    end
+})
+
+local CombatSection = MainTab:CreateSection("Combat")
+MainTab:CreateButton({
+    Name = "วาปไปฆ่าฆาตกร (คุณต้องมีปืนถึงจะใช้ได้)",
+    Callback = function()
+        local hasGun = lplayer.Backpack:FindFirstChild("Gun") or lplayer.Character:FindFirstChild("Gun")
+        if not hasGun then
+            game.StarterGui:SetCore("SendNotification", {
+                Title = "MM2 Admin",
+                Text = "คุณต้องมีปืนถึงจะใช้ได้",
+                Duration = 3
+            })
+            return
+        end
+
+        local Murderer = GetMurderer()
+        if Murderer and Murderer.Character and Murderer.Character:FindFirstChild("HumanoidRootPart") then
+            repeat task.wait()
+                if not getgenv().MM2Admin_Run then break end
+                if lplayer.Character and lplayer.Character:FindFirstChild("HumanoidRootPart") then
+                    lplayer.Character.HumanoidRootPart.CFrame = Murderer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 5)
+                    workspace.CurrentCamera.CFrame = Murderer.Character.HumanoidRootPart.CFrame
+                end
+            until Murderer.Character.Humanoid.Health <= 0 or not getgenv().MM2Admin_Run
+        end
+    end
+})
+
+MainTab:CreateButton({
+    Name = "วาปไปฆ่าทุกคน (คุณต้องมีมีดถึงจะใช้ได้)",
+    Callback = function()
+        local hasKnife = lplayer.Backpack:FindFirstChild("Knife") or lplayer.Character:FindFirstChild("Knife")
+        if not hasKnife then
+            game.StarterGui:SetCore("SendNotification", {
+                Title = "MM2 Admin",
+                Text = "คุณต้องมีมีดถึงจะใช้ได้!",
+                Duration = 3
+            })
+            return
+        end
+
+        for _, Victim in pairs(plrs:GetPlayers()) do
+            if not getgenv().MM2Admin_Run then break end
+            if Victim ~= lplayer and Victim.Character and Victim.Character:FindFirstChild("HumanoidRootPart") then
+                repeat task.wait()
+                    if not getgenv().MM2Admin_Run then break end
+                    if lplayer.Character and lplayer.Character:FindFirstChild("HumanoidRootPart") then
+                        lplayer.Character.HumanoidRootPart.CFrame = Victim.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 1)
+                    end
+                until Victim.Character.Humanoid.Health <= 0 or not getgenv().MM2Admin_Run
+            end
+        end
+    end
+})
+
+MainTab:CreateButton({
+    Name = "วาปไปเก็บปืน (ปืนตกพื้นเท่านั้น)",
+    Callback = function()
+        local gunDrop = workspace:FindFirstChild("GunDrop")
+        if gunDrop then
+            local current = lplayer.Character.HumanoidRootPart.CFrame
+            lplayer.Character.HumanoidRootPart.CFrame = gunDrop.CFrame
+            task.wait(0.25)
+            lplayer.Character.HumanoidRootPart.CFrame = current
+        else
+            game.StarterGui:SetCore("SendNotification", {
+                Title = "MM2 Admin",
+                Text = "รอให้เชอริฟตายก่อนถึงจะเก็บปืนได้",
+                Duration = 2
+            })
+        end
+    end
+})
+
+local MiscSection = MainTab:CreateSection("Misc")
+MainTab:CreateToggle({
+    Name = "X-Ray",
+    CurrentValue = false,
+    Callback = function(Value)
         if Value then XrayOn(workspace) else XrayOff(workspace) end
     end
 })
+
 MainTab:CreateToggle({
     Name = "กันหลุด (Anti-AFK)",
     CurrentValue = true,
@@ -70,6 +460,7 @@ MainTab:CreateToggle({
         end
     end
 })
+
 MainTab:CreateButton({
     Name = "ลดแลค bootfps (กระตุกตอนเปิดเล็กน้อย ถึงปานกลาง)",
     Callback = function()
@@ -115,7 +506,6 @@ MainTab:CreateButton({
     end
 })
 
--- AIM TAB
 local AimSection = AimTab:CreateSection("Aimlock")
 AimTab:CreateToggle({
     Name = "เปิดใช้งาน Aimlock (ล็อคเฉพาะมีปืนเท่านั้น)",
@@ -133,6 +523,7 @@ AimTab:CreateToggle({
         FOVSettings.Enabled = Value
     end
 })
+
 AimTab:CreateToggle({
     Name = "แสดงวง FOV",
     CurrentValue = false,
@@ -140,6 +531,7 @@ AimTab:CreateToggle({
         FOVSettings.Visible = Value
     end
 })
+
 AimTab:CreateSlider({
     Name = "ขนาด FOV",
     Range = {10, 800},
@@ -150,16 +542,7 @@ AimTab:CreateSlider({
         FOVSettings.Amount = Value
     end
 })
--- AimTab:CreateSlider({
---     Name = "ความหนาเส้น",
---     Range = {1, 10},
---     Increment = 1,
---     Suffix = "px",
---     CurrentValue = 1,
---     Callback = function(Value)
---         FOVSettings.Thickness = Value
---     end
--- })
+
 AimTab:CreateSlider({
     Name = "ความโปร่งใส",
     Range = {0, 1},
@@ -170,13 +553,7 @@ AimTab:CreateSlider({
         FOVSettings.Transparency = Value
     end
 })
--- AimTab:CreateToggle({
---     Name = "เปิดโหมดเติมสี",
---     CurrentValue = false,
---     Callback = function(Value)
---         FOVSettings.Filled = Value
---     end
--- })
+
 AimTab:CreateColorPicker({
     Name = "สีวง FOV",
     Color = Color3.fromRGB(255, 255, 255),
@@ -185,7 +562,6 @@ AimTab:CreateColorPicker({
     end
 })
 
--- VISUALS TAB
 local ESPSection = VisualsTab:CreateSection("ESP")
 VisualsTab:CreateToggle({
     Name = "ESP อัจฉริยะแบบอิงตามบทบาท",
@@ -199,6 +575,7 @@ VisualsTab:CreateToggle({
         end
     end
 })
+
 VisualsTab:CreateButton({
     Name = "รีเฟรช ESP",
     Callback = function()
@@ -209,7 +586,6 @@ VisualsTab:CreateButton({
     end
 })
 
--- Auto-refresh ESP
 task.spawn(function()
     while getgenv().MM2Admin_Run and task.wait(5) do
         if ESPToggle then
@@ -219,7 +595,6 @@ task.spawn(function()
     end
 end)
 
--- TELEPORT TAB
 local LocSection = TeleportTab:CreateSection("Locations")
 TeleportTab:CreateButton({
     Name = "TP ไปยังล็อบบี้",
@@ -244,21 +619,31 @@ TeleportTab:CreateButton({
 })
 
 local PlySection = TeleportTab:CreateSection("Players")
-TeleportTab:CreateInput({
-    Name = "TP ไปยังผู้เล่น",
-    PlaceholderText = "Player Name",
-    RemoveTextAfterFocusLost = false,
-    Callback = function(Text)
-        for _, v in pairs(plrs:GetPlayers()) do
-            if string.find(v.Name:lower(), Text:lower()) then
-                if v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
-                    lplayer.Character.HumanoidRootPart.CFrame = v.Character.HumanoidRootPart.CFrame
-                end
-                break
+
+local PlayerDropdown = TeleportTab:CreateDropdown({
+    Name = "เลือกชื่อตัวละคร",
+    Options = GetPlayerNames(),
+    CurrentOption = {""},
+    MultipleOptions = false,
+    Flag = "PlayerTeleportDropdown",
+    Callback = function(Options)
+        local TargetName = Options[1]
+        local Target = plrs:FindFirstChild(TargetName)
+        if Target and Target.Character and Target.Character:FindFirstChild("HumanoidRootPart") then
+            if lplayer.Character and lplayer.Character:FindFirstChild("HumanoidRootPart") then
+                lplayer.Character.HumanoidRootPart.CFrame = Target.Character.HumanoidRootPart.CFrame
             end
         end
+    end,
+})
+
+TeleportTab:CreateButton({
+    Name = "รีเฟรชรายชื่อตัวละคร",
+    Callback = function()
+        PlayerDropdown:Refresh(GetPlayerNames(), true)
     end
 })
+
 TeleportTab:CreateButton({
     Name = "TP ไปยังฆาตกร",
     Callback = function()
@@ -268,6 +653,7 @@ TeleportTab:CreateButton({
         end
     end
 })
+
 TeleportTab:CreateButton({
     Name = "TP ไปยังนายอำเภอ",
     Callback = function()
@@ -278,7 +664,6 @@ TeleportTab:CreateButton({
     end
 })
 
--- PLAYER TAB
 local MoveSection = PlayerTab:CreateSection("Movement")
 PlayerTab:CreateToggle({
     Name = "บิน",
@@ -287,44 +672,12 @@ PlayerTab:CreateToggle({
         if flying ~= Value then ToggleFly() end
     end
 })
-PlayerTab:CreateKeybind({
-    Name = "ปุ่มกดบิน",
-    CurrentKeybind = "X",
-    HoldToInteract = false,
-    Callback = function()
-        ToggleFly()
-    end
-})
-
-PlayerTab:CreateToggle({
-    Name = "เดินทะลุ",
-    CurrentValue = false,
-    Callback = function(Value)
-        noclip = Value
-    end
-})
-PlayerTab:CreateKeybind({
-    Name = "ปุ่มกดเดินทะลุ",
-    CurrentKeybind = "C",
-    HoldToInteract = false,
-    Callback = function()
-        noclip = not noclip
-    end
-})
 
 PlayerTab:CreateToggle({
     Name = "กระโดดไม่จำกัด",
     CurrentValue = false,
     Callback = function(Value)
         InfiniteJump = Value
-    end
-})
-PlayerTab:CreateKeybind({
-    Name = "ปุ่มกดกระโดดไม่จำกัด",
-    CurrentKeybind = "V",
-    HoldToInteract = false,
-    Callback = function()
-        InfiniteJump = not InfiniteJump
     end
 })
 
@@ -341,6 +694,7 @@ PlayerTab:CreateSlider({
         end
     end
 })
+
 PlayerTab:CreateButton({
     Name = "รีเซ็ตความเร็วในการเดิน",
     Callback = function()
@@ -349,6 +703,7 @@ PlayerTab:CreateButton({
         end
     end
 })
+
 PlayerTab:CreateSlider({
     Name = "พลังกระโดด",
     Range = {50, 500},
@@ -361,6 +716,7 @@ PlayerTab:CreateSlider({
         end
     end
 })
+
 PlayerTab:CreateButton({
     Name = "รีเซ็ตพลังกระโดด",
     Callback = function()
