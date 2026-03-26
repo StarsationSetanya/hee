@@ -68,7 +68,7 @@ end
 local faces = {"Back","Bottom","Front","Left","Right","Top"}
 local function ClearESP()
     for _, v in pairs(workspace:GetDescendants()) do
-        if v.Name == ("EGUI") or v.Name == "GunESP" then
+        if v.Name == ("EGUI") then
             v:Destroy()
         end
     end
@@ -480,7 +480,7 @@ MainTab:CreateButton({
 MainTab:CreateButton({
     Name = "วาปไปเก็บปืน (ปืนตกพื้นเท่านั้น)",
     Callback = function()
-        local gunDrop = GetDroppedGun()
+        local gunDrop = workspace:FindFirstChild("GunDrop")
         if gunDrop then
             local current = lplayer.Character.HumanoidRootPart.CFrame
             lplayer.Character.HumanoidRootPart.CFrame = gunDrop.CFrame
