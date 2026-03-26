@@ -27,6 +27,7 @@ local ESPToggle = false
 local CoinFarmToggle = false
 local XrayToggle = false
 local AimlockToggle = false
+local AntiAFKConnection
 
 local FOVSettings = {
     Enabled = false,
@@ -80,6 +81,11 @@ getgenv().MM2Admin_Cleanup = function()
     end
     ClearESP()
     
+    if AntiAFKConnection then
+        AntiAFKConnection:Disconnect()
+        AntiAFKConnection = nil
+    end
+
     -- Attempt to find and destroy old UI ScreenGuis
     local function findAndDestroy(parent)
         if not parent then return end
@@ -444,6 +450,29 @@ MainTab:CreateToggle({
     CurrentValue = false,
     Callback = function(Value)
         if Value then XrayOn(workspace) else XrayOff(workspace) end
+    end
+})
+MainTab:CreateToggle({
+    Name = "กันหลุด (Anti-AFK)",
+    CurrentValue = true,
+    Callback = function(Value)
+        if Value then
+            local bb = game:GetService("VirtualUser")
+            AntiAFKConnection = lplayer.Idled:Connect(function()
+                bb:CaptureController()
+                bb:ClickButton2(Vector2.new())
+                game.StarterGui:SetCore("SendNotification", {
+                    Title = "MM2 Admin",
+                    Text = "ขยับให้แล้วไม่ต้องกลัวหลุด!",
+                    Duration = 2
+                })
+            end)
+        else
+            if AntiAFKConnection then
+                AntiAFKConnection:Disconnect()
+                AntiAFKConnection = nil
+            end
+        end
     end
 })
 MainTab:CreateButton({
