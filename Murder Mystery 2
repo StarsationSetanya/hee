@@ -692,30 +692,30 @@ PlayerTab:CreateToggle({
         if flying ~= Value then ToggleFly() end
     end
 })
-PlayerTab:CreateKeybind({
-    Name = "ปุ่มกดบิน",
-    CurrentKeybind = "X",
-    HoldToInteract = false,
-    Callback = function()
-        ToggleFly()
-    end
-})
+-- PlayerTab:CreateKeybind({
+--     Name = "ปุ่มกดบิน",
+--     CurrentKeybind = "X",
+--     HoldToInteract = false,
+--     Callback = function()
+--         ToggleFly()
+--     end
+-- })
 
-PlayerTab:CreateToggle({
-    Name = "เดินทะลุ",
-    CurrentValue = false,
-    Callback = function(Value)
-        noclip = Value
-    end
-})
-PlayerTab:CreateKeybind({
-    Name = "ปุ่มกดเดินทะลุ",
-    CurrentKeybind = "C",
-    HoldToInteract = false,
-    Callback = function()
-        noclip = not noclip
-    end
-})
+-- PlayerTab:CreateToggle({
+--     Name = "เดินทะลุแมพ",
+--     CurrentValue = false,
+--     Callback = function(Value)
+--         noclip = Value
+--     end
+-- })
+-- PlayerTab:CreateKeybind({
+--     Name = "ปุ่มกดเดินทะลุ",
+--     CurrentKeybind = "C",
+--     HoldToInteract = false,
+--     Callback = function()
+--         noclip = not noclip
+--     end
+-- })
 
 PlayerTab:CreateToggle({
     Name = "กระโดดไม่จำกัด",
@@ -724,14 +724,14 @@ PlayerTab:CreateToggle({
         InfiniteJump = Value
     end
 })
-PlayerTab:CreateKeybind({
-    Name = "ปุ่มกดกระโดดไม่จำกัด",
-    CurrentKeybind = "V",
-    HoldToInteract = false,
-    Callback = function()
-        InfiniteJump = not InfiniteJump
-    end
-})
+-- PlayerTab:CreateKeybind({
+--     Name = "ปุ่มกดกระโดดไม่จำกัด",
+--     CurrentKeybind = "V",
+--     HoldToInteract = false,
+--     Callback = function()
+--         InfiniteJump = not InfiniteJump
+--     end
+-- })
 
 local StatsSection = PlayerTab:CreateSection("Stats")
 PlayerTab:CreateSlider({
